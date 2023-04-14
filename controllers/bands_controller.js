@@ -1,17 +1,17 @@
 // DEPENDENCIES
 const bands = require("express").Router();
 const db = require("../models");
-const { Band } = db;
 const { Op } = require("sequelize");
+const { Band, MeetGreet, Event, SetTime } = db;
 
 // INDEX
 bands.get("/", async (req, res) => {
   try {
     const foundBands = await Band.findAll({
-      order: [["available_start_time", "ASC"]],
       where: {
         name: { [Op.like]: `%${req.query.name ? req.query.name : ""}%` },
       },
+      order: [["end_time", "ASC"]],
     });
     res.status(200).json(foundBands);
   } catch (err) {
@@ -21,10 +21,38 @@ bands.get("/", async (req, res) => {
 });
 
 // SHOW
-bands.get("/:id", async (req, res) => {
+bands.get("/:name", async (req, res) => {
   try {
     const foundBand = await Band.findOne({
-      where: { band_id: req.params.id },
+      where: { name: req.params.name },
+      include: [
+        {
+          model: MeetGreet,
+          as: "meet_greets",
+          include: {
+            model: Event,
+            as: "event",
+            where: {
+              name: {
+                [Op.like]: `%${req.query.event ? req.query.event : ""}%`,
+              },
+            },
+          },
+        },
+        {
+          model: SetTime,
+          as: "set_times",
+          include: {
+            model: Event,
+            as: "event",
+            where: {
+              name: {
+                [Op.like]: `%${req.query.event ? req.query.event : ""}%`,
+              },
+            },
+          },
+        },
+      ],
     });
     res.status(200).json(foundBand);
   } catch (err) {
@@ -47,29 +75,26 @@ bands.post("/", async (req, res) => {
 // UPDATE
 bands.put("/:id", async (req, res) => {
   try {
-    const updatedBands = await bands.update(req.body, {
+    const updatedBands = await Band.update(req.body, {
       where: { band_id: req.params.id },
     });
-    res.status(200).json({ message: `${bandsUpdated} bands updated` });
+    res.status(202).json({ message: `${updatedBands} band(s) updated` });
   } catch (err) {
     console.log(err);
     res.status(500).json({ message: "Server error" });
   }
 });
 
-// DELETE A BAND
+// DELETE
 bands.delete("/:id", async (req, res) => {
   try {
     const deletedBands = await Band.destroy({
-      where: {
-        band_id: req.params.id,
-      },
+      where: { band_id: req.params.id },
     });
-    res.status(200).json({
-      message: `Successfully deleted ${deletedBands} band(s)`,
-    });
+    res.status(200).json({ message: `${deletedBands} band(s) deleted` });
   } catch (err) {
-    res.status(500).json(err);
+    console.log(err);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
